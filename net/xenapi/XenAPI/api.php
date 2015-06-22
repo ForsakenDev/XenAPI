@@ -4951,117 +4951,137 @@ class XenAPI {
             return array('error' => 10, 'errors' => 'Missing required parameter: email');
         }
 
-        // Create a new variable for the password.
-        $password = $user_data['password'];
-
-        // Unset the password from the user data array.
-        unset($user_data['password']);
-
-        if (!empty($user_data['ip_address'])) {
-            // Create a new variable for the ip address.
-            $ip_address = $user_data['ip_address'];
-
-            // Unset the ip address from the user data array.
-            unset($user_data['ip_address']);
-        }
-
-        // Get the default options from XenForo.
-        $options = XenForo_Application::get('options');
-
-        // Create the data writer object for registrations, and set the defaults.
-        $writer = XenForo_DataWriter::create('XenForo_DataWriter_User');
-        if ($options->registrationDefaults) {
-            // Set the default registration options if it's set in the XenForo options.
-            $writer->bulkSet($options->registrationDefaults, array('ignoreInvalidFields' => TRUE));
-        }
-
-        if (!empty($user_data['group_id'])) {
-            // Group ID is set.
-            $writer->set('user_group_id', $user_data['group_id']);
-
-            // We need to unset the group id as we don't want it to be included into the bulk set.
-            unset($user_data['group_id']);
-        } else {
-            // Group ID is not set, default back to default.
-            $writer->set('user_group_id', XenForo_Model_User::$defaultRegisteredGroupId);
-        }
-
-        if (!empty($user_data['user_state'])) {
-            // User state is set.
-            $writer->set('user_state', $user_data['user_state']);
-        } else {
-            // User state is not set, default back to default.
-            $writer->advanceRegistrationUserState();
-        }
-
-        if (!empty($user_data['language_id'])) {
-            // Language ID is set.
-            $writer->set('language_id', $user_data['language_id']);
-        } else {
-            // Language ID is not set, default back to default.
-            $writer->set('language_id', $options->defaultLanguageId);
-        }
-
-        if (!empty($user_data['custom_fields'])) {
-            // Custom fields are set.
-
-            // Check if there are any custom fields in the data array.
-            if (count($user_data['custom_fields']) > 0) {
-                // There were one or more custom fields set, set them in the writer.
-                $writer->setCustomFields($user_data['custom_fields']);
+        $usr = $this->getUser($user_data['username']);
+        if ($usr->isRegistered()) {
+            if ($usr->getEmail() != $user_data['email']) {
+                 $edit_results = $this->editUser($usr, array('email' => $user_data['email'], 'user_state' => 'email_confirm'));
+                 if (!empty($edit_results['error'])) {
+                    return $edit_results;
+                } else {
+                    $user = $this->getUser($user_data['username']);
+                    XenForo_Model::create('XenForo_Model_UserConfirmation')->sendEmailConfirmation($user->getData());
+                    return $user->getData();
+                }
+            } else {
+                return array('error' => 40, 'errors' => 'User already exists');
             }
-            // We need to unset the custom fields as we don't want it to be included into the bulk set.
-            unset($user_data['custom_fields']);
-        }
+        } else {
+            // Create a new variable for the password.
+            $password = $user_data['password'];
 
-        if (!empty($user_data['add_groups'])) {
-            // Add group is set.
+            // Unset the password from the user data array.
+            unset($user_data['password']);
 
-            // Check if there are any custom fields in the data array.
-            if (!is_array($user_data['add_groups']) || count($user_data['add_groups']) == 0) {
-                // The edit failed, return errors.
-                return array('error' => 7, 'errors' => 'The add_groups parameter needs to be an array and have at least 1 item.');
+            if (!empty($user_data['ip_address'])) {
+                // Create a new variable for the ip address.
+                $ip_address = $user_data['ip_address'];
+
+                // Unset the ip address from the user data array.
+                unset($user_data['ip_address']);
             }
 
-            // Set the secondary group(s) of the user.
-            $writer->setSecondaryGroups($user_data['add_groups']);
+            // Get the default options from XenForo.
+            $options = XenForo_Application::get('options');
 
-            // We need to unset the group id as we don't want it to be included into the bulk set.
-            unset($user_data['add_groups']);
+            // Create the data writer object for registrations, and set the defaults.
+            $writer = XenForo_DataWriter::create('XenForo_DataWriter_User');
+            if ($options->registrationDefaults) {
+                // Set the default registration options if it's set in the XenForo options.
+                $writer->bulkSet($options->registrationDefaults, array('ignoreInvalidFields' => TRUE));
+            }
+
+            if (!empty($user_data['group_id'])) {
+                // Group ID is set.
+                $writer->set('user_group_id', $user_data['group_id']);
+
+                // We need to unset the group id as we don't want it to be included into the bulk set.
+                unset($user_data['group_id']);
+            } else {
+                // Group ID is not set, default back to default.
+                $writer->set('user_group_id', XenForo_Model_User::$defaultRegisteredGroupId);
+            }
+
+            if (!empty($user_data['user_state'])) {
+                // User state is set.
+                $writer->set('user_state', $user_data['user_state']);
+            } else {
+                // User state is not set, default back to default.
+                $writer->advanceRegistrationUserState();
+            }
+
+            if (!empty($user_data['language_id'])) {
+                // Language ID is set.
+                $writer->set('language_id', $user_data['language_id']);
+            } else {
+                // Language ID is not set, default back to default.
+                $writer->set('language_id', $options->defaultLanguageId);
+            }
+
+            if (!empty($user_data['custom_fields'])) {
+                // Custom fields are set.
+
+                // Check if there are any custom fields in the data array.
+                if (count($user_data['custom_fields']) > 0) {
+                    // There were one or more custom fields set, set them in the writer.
+                    $writer->setCustomFields($user_data['custom_fields']);
+                }
+                // We need to unset the custom fields as we don't want it to be included into the bulk set.
+                unset($user_data['custom_fields']);
+            }
+
+            if (!empty($user_data['add_groups'])) {
+                // Add group is set.
+
+                // Check if there are any custom fields in the data array.
+                if (!is_array($user_data['add_groups']) || count($user_data['add_groups']) == 0) {
+                    // The edit failed, return errors.
+                    return array('error' => 7, 'errors' => 'The add_groups parameter needs to be an array and have at least 1 item.');
+                }
+
+                // Set the secondary group(s) of the user.
+                $writer->setSecondaryGroups($user_data['add_groups']);
+
+                // We need to unset the group id as we don't want it to be included into the bulk set.
+                unset($user_data['add_groups']);
+            }
+
+            // Check if Gravatar is enabled, set the gravatar if it is and there's a gravatar for the email.
+            if ($options->gravatarEnable && XenForo_Model_Avatar::gravatarExists($data['email'])) {
+                $writer->set('gravatar', $user_data['email']);
+            }
+
+            // Set the data for the data writer.
+            $writer->bulkSet($user_data);
+
+            // Set the password for the data writer.
+            $writer->setPassword($password, $password);
+
+            // Pre save the data.
+            $writer->preSave();
+
+            if ($writer->hasErrors()) {
+                // The registration failed, return errors.
+                return array('error' => TRUE, 'errors' => $writer->getErrors());
+            }
+
+            // Save the user to the database.
+            $writer->save();
+             
+            // Get the User as a variable:
+            $user = $writer->getMergedData();
+
+            // Check if IP is set.
+            if (!empty($user_data['ip_address'])) {
+                // Log the IP of the user that registered.
+                XenForo_Model_Ip::log($user['user_id'], 'user', $user['user_id'], 'register', $ip_address);
+            }
+            if ($user['user_state'] == 'email_confirm') {
+                XenForo_Model::create('XenForo_Model_UserConfirmation')->sendEmailConfirmation($user);
+            } else if ($user['user_state'] == 'valid') {
+                XenForo_Model::create('XenForo_Model_UserConfirmation')->resetPassword($user['user_id'], true); 
+            }
+            return $user;
         }
-
-        // Check if Gravatar is enabled, set the gravatar if it is and there's a gravatar for the email.
-        if ($options->gravatarEnable && XenForo_Model_Avatar::gravatarExists($data['email'])) {
-            $writer->set('gravatar', $user_data['email']);
-        }
-
-        // Set the data for the data writer.
-        $writer->bulkSet($user_data);
-
-        // Set the password for the data writer.
-        $writer->setPassword($password, $password);
-
-        // Pre save the data.
-        $writer->preSave();
-
-        if ($writer->hasErrors()) {
-            // The registration failed, return errors.
-            return array('error' => TRUE, 'errors' => $writer->getErrors());
-        }
-
-        // Save the user to the database.
-        $writer->save();
-         
-        // Get the User as a variable:
-        $user = $writer->getMergedData();
-
-        // Check if IP is set.
-        if (!empty($user_data['ip_address'])) {
-            // Log the IP of the user that registered.
-            XenForo_Model_Ip::log($user['user_id'], 'user', $user['user_id'], 'register', $ip_address);
-        }
-         
-        return $user;
     }
 }
 
